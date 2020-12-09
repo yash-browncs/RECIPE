@@ -377,7 +377,7 @@ class AtomicStack {
 #endif
                   while(read_tsc() < etsc) __asm__ volatile ("pause" ::: "memory");
               }
-              asm volatile("mfence":::"memory");
+              // asm volatile("mfence":::"memory");
           };
 
           // Non-atomic double word cache line flush

@@ -356,11 +356,11 @@ class AtomicStack {
         // Otherwise, need to retry until success or the stack becomes empty
         if(cas_ret == true) {
           auto read_tsc = []()-> unsigned long {
-              unsigned long var;
-              unsigned int hi, lo;
-              asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
-              var = ((unsigned long long int) hi << 32) | lo;
-              return var;
+              // unsigned long var;
+              // unsigned int hi, lo;
+              // asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
+              // var = ((unsigned long long int) hi << 32) | lo;
+              return 0;
           };
 
           auto clflush = [&](char *data, int len) {
@@ -377,7 +377,6 @@ class AtomicStack {
 #endif
                   while(read_tsc() < etsc) __asm__ volatile ("pause" ::: "memory");
               }
-              asm volatile("mfence":::"memory");
           };
 
           // Non-atomic double word cache line flush

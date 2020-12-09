@@ -10,15 +10,9 @@
 
 using namespace std;
 
-#include "P-ART/Tree.h"
+#include "Key.h"
 #include "third-party/FAST_FAIR/btree.h"
-#include "third-party/CCEH/src/Level_hashing.h"
-#include "third-party/CCEH/src/CCEH.h"
-#include "third-party/WOART/woart.h"
-#include "masstree.h"
 #include "P-BwTree/src/bwtree.h"
-#include "clht.h"
-#include "ssmem.h"
 
 #ifdef HOT
 #include <hot/rowex/HOTRowex.hpp>
@@ -68,7 +62,7 @@ enum {
 };
 
 namespace Dummy {
-    inline void mfence() {asm volatile("mfence":::"memory");}
+    inline void mfence() {}//asm volatile("mfence":::"memory");}
 
     inline void clflush(char *data, int len, bool front, bool back)
     {
@@ -162,74 +156,74 @@ class KeyEqualityChecker {
 };
 /////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////Helper functions for P-HOT/////////////////////////////
-typedef struct IntKeyVal {
-    uint64_t key;
-    uintptr_t value;
-} IntKeyVal;
+// ////////////////////////Helper functions for P-HOT/////////////////////////////
+// typedef struct IntKeyVal {
+//     uint64_t key;
+//     uintptr_t value;
+// } IntKeyVal;
 
-template<typename ValueType = IntKeyVal *>
-class IntKeyExtractor {
-    public:
-    typedef uint64_t KeyType;
+// template<typename ValueType = IntKeyVal *>
+// class IntKeyExtractor {
+//     public:
+//     typedef uint64_t KeyType;
 
-    inline KeyType operator()(ValueType const &value) const {
-        return value->key;
-    }
-};
+//     inline KeyType operator()(ValueType const &value) const {
+//         return value->key;
+//     }
+// };
 
-template<typename ValueType = Key *>
-class KeyExtractor {
-    public:
-    typedef char const * KeyType;
+// template<typename ValueType = Key *>
+// class KeyExtractor {
+//     public:
+//     typedef char const * KeyType;
 
-    inline KeyType operator()(ValueType const &value) const {
-        return (char const *)value->fkey;
-    }
-};
-/////////////////////////////////////////////////////////////////////////////////
+//     inline KeyType operator()(ValueType const &value) const {
+//         return (char const *)value->fkey;
+//     }
+// };
+// /////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////Helper functions for P-CLHT/////////////////////////////
-typedef struct thread_data {
-    uint32_t id;
-    clht_t *ht;
-} thread_data_t;
+// ////////////////////////Helper functions for P-CLHT/////////////////////////////
+// typedef struct thread_data {
+//     uint32_t id;
+//     clht_t *ht;
+// } thread_data_t;
 
-typedef struct barrier {
-    pthread_cond_t complete;
-    pthread_mutex_t mutex;
-    int count;
-    int crossing;
-} barrier_t;
+// typedef struct barrier {
+//     pthread_cond_t complete;
+//     pthread_mutex_t mutex;
+//     int count;
+//     int crossing;
+// } barrier_t;
 
-void barrier_init(barrier_t *b, int n) {
-    pthread_cond_init(&b->complete, NULL);
-    pthread_mutex_init(&b->mutex, NULL);
-    b->count = n;
-    b->crossing = 0;
-}
+// void barrier_init(barrier_t *b, int n) {
+//     pthread_cond_init(&b->complete, NULL);
+//     pthread_mutex_init(&b->mutex, NULL);
+//     b->count = n;
+//     b->crossing = 0;
+// }
 
-void barrier_cross(barrier_t *b) {
-    pthread_mutex_lock(&b->mutex);
-    b->crossing++;
-    if (b->crossing < b->count) {
-        pthread_cond_wait(&b->complete, &b->mutex);
-    } else {
-        pthread_cond_broadcast(&b->complete);
-        b->crossing = 0;
-    }
-    pthread_mutex_unlock(&b->mutex);
-}
+// void barrier_cross(barrier_t *b) {
+//     pthread_mutex_lock(&b->mutex);
+//     b->crossing++;
+//     if (b->crossing < b->count) {
+//         pthread_cond_wait(&b->complete, &b->mutex);
+//     } else {
+//         pthread_cond_broadcast(&b->complete);
+//         b->crossing = 0;
+//     }
+//     pthread_mutex_unlock(&b->mutex);
+// }
 
-barrier_t barrier;
+// barrier_t barrier;
 /////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t LOAD_SIZE = 64000000;
 static uint64_t RUN_SIZE = 64000000;
 
-void loadKey(TID tid, Key &key) {
-    return ;
-}
+// void loadKey(TID tid, Key &key) {
+//     return ;
+// }
 
 void ycsb_load_run_string(int index_type, int wl, int kt, int ap, int num_thread,
         std::vector<Key *> &init_keys,
@@ -335,59 +329,6 @@ void ycsb_load_run_string(int index_type, int wl, int kt, int ap, int num_thread
         count++;
     }
 
-    if (index_type == TYPE_ART) {
-        ART_ROWEX::Tree tree(loadKey);
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree.getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    Key *key = key->make_leaf((char *)init_keys[i]->fkey, init_keys[i]->key_len, init_keys[i]->value);
-                    tree.insert(key, t);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            Key *end = end->make_leaf((char *)maxKey.c_str(), maxKey.size()+1, 0);
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree.getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    Key *key;
-                    if (ops[i] == OP_INSERT) {
-                        key = key->make_leaf((char *)keys[i]->fkey, keys[i]->key_len, keys[i]->value);
-                        tree.insert(key, t);
-                    } else if (ops[i] == OP_READ) {
-                        key = key->make_leaf((char *)keys[i]->fkey, keys[i]->key_len, keys[i]->value);
-                        Key *val = reinterpret_cast<Key *>(tree.lookup(key, t));
-                        if (val->value != keys[i]->value) {
-                            std::cout << "[ART] wrong key read: " << val->value << " expected:" << keys[i]->value << std::endl;
-                            throw;
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        Key *results[200];
-                        Key *continueKey = NULL;
-                        size_t resultsFound = 0;
-                        size_t resultsSize = ranges[i];
-                        Key *start = start->make_leaf((char *)keys[i]->fkey, keys[i]->key_len, keys[i]->value);
-                        tree.lookupRange(start, end, continueKey, results, resultsSize, resultsFound, t);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
 #ifdef HOT
     } else if (index_type == TYPE_HOT) {
         hot::rowex::HOTRowex<Key *, KeyExtractor> mTrie;
@@ -442,7 +383,7 @@ void ycsb_load_run_string(int index_type, int wl, int kt, int ap, int num_thread
             printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
         }
 #endif
-    } else if (index_type == TYPE_BWTREE) {
+    if (index_type == TYPE_BWTREE) {
         auto t = new BwTree<char *, uint64_t, KeyComparator, KeyEqualityChecker>{true, KeyComparator{1}, KeyEqualityChecker{1}};
         t->UpdateThreadLocal(1);
         t->AssignGCID(0);
@@ -532,142 +473,6 @@ void ycsb_load_run_string(int index_type, int wl, int kt, int ap, int num_thread
                     std::chrono::system_clock::now() - starttime);
             printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
         }
-    } else if (index_type == TYPE_MASSTREE) {
-        masstree::masstree *tree = new masstree::masstree();
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree->getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    tree->put((char *)init_keys[i]->fkey, init_keys[i]->value, t);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree->getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        tree->put((char *)keys[i]->fkey, keys[i]->value, t);
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *ret = reinterpret_cast<uint64_t *> (tree->get((char *)keys[i]->fkey, t));
-                        if (ap == UNIFORM && (uint64_t) ret != keys[i]->value) {
-                            printf("[MASS] search key = %lu, search value = %lu\n", keys[i]->value, ret);
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        int resultsFound;
-                        uint64_t results[200];
-                        resultsFound = tree->scan((char *)keys[i]->fkey, ranges[i], results, t);
-                    } else if (ops[i] == OP_DELETE) {
-                        tree->del((char *)keys[i]->fkey, t);
-                    } else if (ops[i] == OP_UPDATE) {
-                        tree->put((char *)keys[i]->fkey, keys[i]->value, t);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-    } else if (index_type == TYPE_FASTFAIR) {
-        fastfair::btree *bt = new fastfair::btree();
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    bt->btree_insert((char *)init_keys[i]->fkey, (char *) &init_keys[i]->value);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        bt->btree_insert((char *)keys[i]->fkey, (char *) &keys[i]->value);
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *ret = reinterpret_cast<uint64_t *> (bt->btree_search((char *)keys[i]->fkey));
-                        if (ret == NULL) {
-                            //printf("Return value is NULL\n");
-                        }else if (*ret != keys[i]->value) {
-                            //printf("[FASTFAIR] wrong value was returned: originally expected %lu\n", keys[i]->value);
-                            //exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        uint64_t buf[200];
-                        int resultsFound = 0;
-                        bt->btree_search_range ((char *)keys[i]->fkey, (char *)maxKey.c_str(), buf, ranges[i], resultsFound);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-    } else if (index_type == TYPE_WOART) {
-#ifdef STRING_TYPE
-        woart_tree *t = (woart_tree *)malloc(sizeof(woart_tree));
-        woart_tree_init(t);
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    woart_insert(t, init_keys[i]->fkey, init_keys[i]->key_len, &init_keys[i]->value);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        woart_insert(t, keys[i]->fkey, keys[i]->key_len, &keys[i]->value);
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *ret = reinterpret_cast<uint64_t *> (woart_search(t, keys[i]->fkey, keys[i]->key_len));
-                        if (*ret != keys[i]->value) {
-                            printf("[WOART] search key = %lu, search value = %lu\n", keys[i]->value, *ret);
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        unsigned long buf[200];
-                        woart_scan(t, keys[i]->fkey, keys[i]->key_len, ranges[i], buf);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-#endif
     }
 }
 
@@ -773,117 +578,7 @@ void ycsb_load_run_randint(int index_type, int wl, int kt, int ap, int num_threa
     range_complete.store(0);
     range_incomplete.store(0);
 
-    if (index_type == TYPE_ART) {
-        ART_ROWEX::Tree tree(loadKey);
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree.getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    Key *key = key->make_leaf(init_keys[i], sizeof(uint64_t), init_keys[i]);
-                    tree.insert(key, t);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            Key *end = end->make_leaf(UINT64_MAX, sizeof(uint64_t), 0);
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree.getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        Key *key = key->make_leaf(keys[i], sizeof(uint64_t), keys[i]);
-                        tree.insert(key, t);
-                    } else if (ops[i] == OP_READ) {
-                        Key *key = key->make_leaf(keys[i], sizeof(uint64_t), 0);
-                        uint64_t *val = reinterpret_cast<uint64_t *>(tree.lookup(key, t));
-                        if (*val != keys[i]) {
-                            std::cout << "[ART] wrong key read: " << val << " expected:" << keys[i] << std::endl;
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        Key *results[200];
-                        Key *continueKey = NULL;
-                        size_t resultsFound = 0;
-                        size_t resultsSize = ranges[i];
-                        Key *start = start->make_leaf(keys[i], sizeof(uint64_t), 0);
-                        tree.lookupRange(start, end, continueKey, results, resultsSize, resultsFound, t);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-#ifdef HOT
-    } else if (index_type == TYPE_HOT) {
-        hot::rowex::HOTRowex<IntKeyVal *, IntKeyExtractor> mTrie;
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    IntKeyVal *key;
-                    posix_memalign((void **)&key, 64, sizeof(IntKeyVal));
-                    key->key = init_keys[i]; key->value = init_keys[i];
-                    Dummy::clflush((char *)key, sizeof(IntKeyVal), true, true);
-                    if (!(mTrie.insert(key))) {
-                        fprintf(stderr, "[HOT] load insert fail\n");
-                        exit(1);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        IntKeyVal *key;
-                        posix_memalign((void **)&key, 64, sizeof(IntKeyVal));
-                        key->key = keys[i]; key->value = keys[i];
-                        Dummy::clflush((char *)key, sizeof(IntKeyVal), true, true);
-                        if (!(mTrie.insert(key))) {
-                            fprintf(stderr, "[HOT] run insert fail\n");
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_READ) {
-                        idx::contenthelpers::OptionalValue<IntKeyVal *> result = mTrie.lookup(keys[i]);
-                        if (!result.mIsValid || result.mValue->value != keys[i]) {
-                            printf("mIsValid = %d\n", result.mIsValid);
-                            printf("Return value = %lu, Correct value = %lu\n", result.mValue->value, keys[i]);
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        idx::contenthelpers::OptionalValue<IntKeyVal *> result = mTrie.scan(keys[i], ranges[i]);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-#endif
-    } else if (index_type == TYPE_BWTREE) {
+    if (index_type == TYPE_BWTREE) {
         auto t = new BwTree<uint64_t, uint64_t, KeyComparator, KeyEqualityChecker>{true, KeyComparator{1}, KeyEqualityChecker{1}};
         t->UpdateThreadLocal(1);
         t->AssignGCID(0);
@@ -971,314 +666,6 @@ void ycsb_load_run_randint(int index_type, int wl, int kt, int ap, int num_threa
                     std::chrono::system_clock::now() - starttime);
             printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
         }
-    } else if (index_type == TYPE_MASSTREE) {
-        masstree::masstree *tree = new masstree::masstree();
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree->getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    tree->put(init_keys[i], &init_keys[i], t);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                auto t = tree->getThreadInfo();
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        tree->put(keys[i], &keys[i], t);
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *ret = reinterpret_cast<uint64_t *> (tree->get(keys[i], t));
-                        if (ap == UNIFORM && *ret != keys[i]) {
-                            printf("[MASS] search key = %lu, search value = %lu\n", keys[i], *ret);
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        uint64_t buf[200];
-                        int ret = tree->scan(keys[i], ranges[i], buf, t);
-                    } else if (ops[i] == OP_DELETE) {
-                        tree->del(keys[i], t);
-                    } else if (ops[i] == OP_UPDATE) {
-                        tree->put(keys[i], &keys[i], t);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-    } else if (index_type == TYPE_CLHT) {
-        clht_t *hashtable = clht_create(512);
-
-        barrier_init(&barrier, num_thread);
-
-        thread_data_t *tds = (thread_data_t *) malloc(num_thread * sizeof(thread_data_t));
-
-        std::atomic<int> next_thread_id;
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            next_thread_id.store(0);
-            auto func = [&]() {
-                int thread_id = next_thread_id.fetch_add(1);
-                tds[thread_id].id = thread_id;
-                tds[thread_id].ht = hashtable;
-
-                uint64_t start_key = LOAD_SIZE / num_thread * (uint64_t)thread_id;
-                uint64_t end_key = start_key + LOAD_SIZE / num_thread;
-
-                clht_gc_thread_init(tds[thread_id].ht, tds[thread_id].id);
-                barrier_cross(&barrier);
-
-                for (uint64_t i = start_key; i < end_key; i++) {
-                    clht_put(tds[thread_id].ht, init_keys[i], init_keys[i]);
-                }
-            };
-
-            std::vector<std::thread> thread_group;
-
-            for (int i = 0; i < num_thread; i++)
-                thread_group.push_back(std::thread{func});
-
-            for (int i = 0; i < num_thread; i++)
-                thread_group[i].join();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        barrier.crossing = 0;
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            next_thread_id.store(0);
-            auto func = [&]() {
-                int thread_id = next_thread_id.fetch_add(1);
-                tds[thread_id].id = thread_id;
-                tds[thread_id].ht = hashtable;
-
-                uint64_t start_key = RUN_SIZE / num_thread * (uint64_t)thread_id;
-                uint64_t end_key = start_key + RUN_SIZE / num_thread;
-
-                clht_gc_thread_init(tds[thread_id].ht, tds[thread_id].id);
-                barrier_cross(&barrier);
-
-                for (uint64_t i = start_key; i < end_key; i++) {
-                    if (ops[i] == OP_INSERT) {
-                        clht_put(tds[thread_id].ht, keys[i], keys[i]);
-                    } else if (ops[i] == OP_READ) {
-                        uintptr_t val = clht_get(tds[thread_id].ht->ht, keys[i]);
-                        if (val != keys[i]) {
-                            std::cout << "[CLHT] wrong key read: " << val << "expected: " << keys[i] << std::endl;
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            };
-
-            std::vector<std::thread> thread_group;
-
-            for (int i = 0; i < num_thread; i++)
-                thread_group.push_back(std::thread{func});
-
-            for (int i = 0; i < num_thread; i++)
-                thread_group[i].join();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-        clht_gc_destroy(hashtable);
-    } else if (index_type == TYPE_FASTFAIR) {
-        fastfair::btree *bt = new fastfair::btree();
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    bt->btree_insert(init_keys[i], (char *) &init_keys[i]);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        bt->btree_insert(keys[i], (char *) &keys[i]);
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *ret = reinterpret_cast<uint64_t *>(bt->btree_search(keys[i]));
-                        if (ret == NULL) {
-                            //printf("NULL is found\n");
-                        } else if (*ret != keys[i]) {
-                            //printf("[FASTFAIR] wrong value is returned: <expected> %lu\n", keys[i]);
-                            //exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        uint64_t buf[200];
-                        int resultsFound = 0;
-                        bt->btree_search_range (keys[i], UINT64_MAX, buf, ranges[i], resultsFound);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-    } else if (index_type == TYPE_LEVELHASH) {
-        Hash *table = new LevelHashing(10);
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    table->Insert(init_keys[i], reinterpret_cast<const char*>(&init_keys[i]));
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        table->Insert(keys[i], reinterpret_cast<const char*>(&keys[i]));
-                    } else if (ops[i] == OP_READ) {
-                        auto val = table->Get(keys[i]);
-                        if (val == NONE) {
-                            std::cout << "[Level Hashing] wrong key read: " << *(uint64_t *)val << " expected: " << keys[i] << std::endl;
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-    } else if (index_type == TYPE_CCEH) {
-        Hash *table = new CCEH(2);
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    table->Insert(init_keys[i], reinterpret_cast<const char*>(&init_keys[i]));
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        table->Insert(keys[i], reinterpret_cast<const char*>(&keys[i]));
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *val = reinterpret_cast<uint64_t *>(const_cast<char *>(table->Get(keys[i])));
-                        if (val == NULL) {
-                            //std::cout << "[CCEH] wrong value is read <expected:> " << keys[i] << std::endl;
-                            //exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-    } else if (index_type == TYPE_WOART) {
-#ifndef STRING_TYPE
-        woart_tree *t = (woart_tree *)malloc(sizeof(woart_tree));
-        woart_tree_init(t);
-
-        {
-            // Load
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, LOAD_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    woart_insert(t, init_keys[i], sizeof(uint64_t), &init_keys[i]);
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: load, %f ,ops/us\n", (LOAD_SIZE * 1.0) / duration.count());
-        }
-
-        {
-            // Run
-            auto starttime = std::chrono::system_clock::now();
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, RUN_SIZE), [&](const tbb::blocked_range<uint64_t> &scope) {
-                for (uint64_t i = scope.begin(); i != scope.end(); i++) {
-                    if (ops[i] == OP_INSERT) {
-                        woart_insert(t, keys[i], sizeof(uint64_t), &keys[i]);
-                    } else if (ops[i] == OP_READ) {
-                        uint64_t *ret = reinterpret_cast<uint64_t *> (woart_search(t, keys[i], sizeof(uint64_t)));
-                        if (*ret != keys[i]) {
-                            printf("[WOART] expected = %lu, search value = %lu\n", keys[i], *ret);
-                            exit(1);
-                        }
-                    } else if (ops[i] == OP_SCAN) {
-                        unsigned long buf[200];
-                        woart_scan(t, keys[i], ranges[i], buf);
-                    } else if (ops[i] == OP_UPDATE) {
-                        std::cout << "NOT SUPPORTED CMD!\n";
-                        exit(0);
-                    }
-                }
-            });
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::system_clock::now() - starttime);
-            printf("Throughput: run, %f ,ops/us\n", (RUN_SIZE * 1.0) / duration.count());
-        }
-#endif
     }
 }
 

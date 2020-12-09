@@ -37,13 +37,13 @@ static inline void cpu_pause()
 }
 static inline unsigned long read_tsc(void)
 {
-    unsigned long var;
-    unsigned int hi, lo;
+    // unsigned long var;
+    // unsigned int hi, lo;
 
-    asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
-    var = ((unsigned long long int) hi << 32) | lo;
+    // asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
+    // var = ((unsigned long long int) hi << 32) | lo;
 
-    return var;
+    return 0;
 }
 
 static unsigned long write_latency_in_ns=0;
@@ -57,13 +57,11 @@ using namespace std;
 
 static inline void mfence()
 {
-    asm volatile("mfence":::"memory");
 }
 
 static inline void clflush(char *data, int len)
 {
     volatile char *ptr = (char *)((unsigned long)data &~(CACHE_LINE_SIZE-1));
-    mfence();
     for(; ptr<data+len; ptr+=CACHE_LINE_SIZE){
         unsigned long etsc = read_tsc() + 
             (unsigned long)(write_latency_in_ns*CPU_FREQ_MHZ/1000);
@@ -76,7 +74,6 @@ static inline void clflush(char *data, int len)
 #endif
         while (read_tsc() < etsc) cpu_pause();
     }
-    mfence();
 }
 
 #ifdef LOCK_INIT
