@@ -20,5 +20,7 @@ object files for current source.
 TODO
 
 Update README with exact commands
+
 Rewrite Makefile in build/ with relative paths
+
 Clean up unnecessary/unused folders (data structures except BwTree)
