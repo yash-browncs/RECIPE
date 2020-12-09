@@ -12,8 +12,6 @@ the resulting binary to gem5 mount directory and run `./ycsb`. Use `libIndexes.a
 object files for current source.
 
 ```
-/usr/lib/gcc-cross/aarch64-linux-gnu/9/../../../../aarch64-linux-gnu/bin/ld: cannot find -lboost_system
-/usr/lib/gcc-cross/aarch64-linux-gnu/9/../../../../aarch64-linux-gnu/bin/ld: cannot find -lboost_thread
 /usr/lib/gcc-cross/aarch64-linux-gnu/9/../../../../aarch64-linux-gnu/bin/ld: cannot find -ltbb
 ```
 
