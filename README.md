@@ -8,7 +8,7 @@ Currently only uses P-BwTree, since other data structures have several other dep
 x86 only assembly instructions in source.
 
 On installing ARM libtbb locally, just use -L/path/to/ARM/libtbb and -ltbb in the linker command. Copy 
-the resulting binary to gem5 mount directory and run `./ycsb`. Use `libIndexes.a` and `yc.o` as precompiled 
+the resulting binary to gem5 mount directory and run `./ycsb`. Use `libIndexes.a` and `yc.o` as precompiled x86
 object files for current source.
 
 ```
